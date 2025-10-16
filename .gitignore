@@ -1,0 +1,22 @@
+# Environment
+.env
+backend/.env
+frontend/.env
+
+# Node / Nuxt
+node_modules/
+.nuxt/
+.pnpm-store/
+frontend/.output/
+
+# Logs
+*.log
+
+# Docker
+postgres_data/
+docker/*.pid
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
