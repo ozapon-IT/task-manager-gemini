@@ -1,11 +1,12 @@
-FROM eclipse-temurin:17-jdk-jammy
-
+# ---- Build Stage ----
+FROM gradle:8.7-jdk17 AS builder
 WORKDIR /app
+COPY . .
+RUN ./gradlew bootJar --no-daemon
 
-COPY . ./
-
-RUN ./gradlew build -x test
-
+# ---- Run Stage ----
+FROM eclipse-temurin:17-jdk-jammy
+WORKDIR /app
+COPY --from=builder /app/build/libs/*.jar app.jar
 EXPOSE 8080
-
-CMD ["java", "-jar", "build/libs/task-manager-0.0.1-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

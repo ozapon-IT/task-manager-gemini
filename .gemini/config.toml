@@ -1,0 +1,4 @@
+[default]
+model = "gemini-2.5-flash"
+context = true
+temperature = 0.4
