@@ -1,32 +1,42 @@
 package com.example.taskmanager.controller;
 
 import com.example.taskmanager.entity.Project;
+import com.example.taskmanager.repository.ProjectRepository;
 import com.example.taskmanager.service.ProjectService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/projects")
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectRepository projectRepository;
 
-    public ProjectController(ProjectService projectService) {
+    public ProjectController(ProjectService projectService, ProjectRepository projectRepository) {
         this.projectService = projectService;
+        this.projectRepository = projectRepository;
     }
 
     @GetMapping
-    public List<Project> findAll() {
-        return projectService.findAll();
+    public Page<Project> findAll(Pageable pageable) {
+        // @Where により deleted_at IS NULL のみ返される
+        return projectRepository.findAll(pageable);
     }
 
     @GetMapping("/{id}")
-    public Project findById(@PathVariable Long id) {
-        return projectService.findById(id);
+    public ResponseEntity<Project> findById(@PathVariable Long id) {
+        return projectService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     public Project save(@RequestBody Project project) {
         return projectService.save(project);
     }
@@ -38,7 +48,8 @@ public class ProjectController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteById(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteById(@PathVariable Long id) {
         projectService.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }

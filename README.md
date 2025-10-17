@@ -46,18 +46,25 @@ Task Manager は **Nuxt 3 + Spring Boot** を統合したフルスタックな�
 
 ## 📂 主要ディレクトリ構成
 
+```text
 .
-├── backend/ # Spring Boot API（JPA, Controller, Service, Repository 層を含む）
-│ ├── src/main/java/com/example/taskmanager
-│ ├── src/test/java/com/example/taskmanager (Featureテスト)
-│ └── build.gradle
-├── frontend/ # Nuxt 3 + TypeScript SPA
-│ ├── src/
-│ ├── types/ # 共通型定義
-│ └── nuxt.config.ts
-├── docker/ # 各コンテナ (nginx, spring, nuxt) の設定
-├── Makefile # Docker 操作用ショートカット
-└── docker-compose.yml
+├── backend/   # Spring Boot API
+│   ├── src/
+│   │   ├── main/java/com/example/taskmanager/   # アプリケーション本体
+│   │   └── test/java/com/example/taskmanager/   # Featureテスト
+│   └── build.gradle                             # Gradle設定ファイル
+│
+├── frontend/                       # Nuxt 3 + TypeScript SPA
+│   ├── src/                        # ページ・コンポーネント・ストア等
+│   ├── types/                      # 共通型定義
+│   └── nuxt.config.ts              # Nuxt設定ファイル
+│
+├── docker/                         # 各コンテナの設定
+│
+├── Makefile                        # Docker 操作用ショートカットコマンド
+│
+└── docker-compose.yml              # 開発環境構築用 Compose ファイル
+```
 
 ---
 
@@ -70,4 +77,36 @@ Task Manager は **Nuxt 3 + Spring Boot** を統合したフルスタックな�
 
 ---
 
+## 🧪 テスト実行方法
 
+本プロジェクトでは、Spring Boot + Gradle による自動テストを Docker 環境で実行できます。
+
+### 実行コマンド
+
+```bash
+# バックエンドAPI（H2メモリDB使用）の自動テスト実行
+docker run --rm \
+  -v "$(pwd)/backend":/app \
+  -w /app \
+  gradle:8.4-jdk17 \
+  ./gradlew clean test --no-daemon
+```
+
+### 実行内容
+
+- Spring Boot の単体・結合テスト（FeatureTestを含む）を実行
+
+- H2メモリDBを利用して Flyway マイグレーションをスキップ
+
+- Project / Task / PingController など主要APIのCRUD検証を行う
+
+- テスト結果レポートは`backend/build/reports/tests/test/index.html`に出力されます
+
+### 成功時の出力例
+
+```bash
+BUILD SUCCESSFUL in 33s
+6 actionable tasks: 6 executed
+```
+
+上記が表示されれば、すべてのテストが正常に通過しています
