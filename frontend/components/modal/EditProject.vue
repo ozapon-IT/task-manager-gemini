@@ -13,8 +13,8 @@
             <h3 class="text-xl leading-6 font-medium text-gray-900 dark:text-gray-100 mb-6">{{ project && project.id ? 'Edit Project' : 'New Project' }}</h3>
             <div class="space-y-6">
               <div>
-                <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
-                <input v-model="form.name" type="text" id="name" class="block w-full shadow-sm sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 px-3 py-2" required>
+                <label for="title" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <input v-model="form.title" type="text" id="title" class="block w-full shadow-sm sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 px-3 py-2" required>
               </div>
               <div>
                 <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
@@ -27,9 +27,9 @@
               <div>
                 <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
                 <select v-model="form.status" id="status" class="block w-full shadow-sm sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 px-3 py-2" required>
-                  <option value="todo">To Do</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="done">Done</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="COMPLETED">Completed</option>
                 </select>
               </div>
             </div>
@@ -45,31 +45,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, defineProps, defineEmits } from 'vue'
+import { ref, watch } from 'vue'
 import type { Project, ProjectStatus } from '~/types/api'
 
 const props = defineProps<{ show: boolean; project: Project | null }>()
 const emit = defineEmits(['close', 'save'])
 
 const form = ref<Omit<Project, 'id'> & { id?: number }>({
-  name: '',
+  title: '',
   description: '',
   dueDate: '',
-  status: 'todo' as ProjectStatus,
+  status: 'DRAFT' as ProjectStatus,
 })
 
-watch(() => props.project, (newVal) => {
-  if (newVal) {
-    form.value = { ...newVal }
-  } else {
-    form.value = {
-      name: '',
-      description: '',
-      dueDate: '',
-      status: 'todo' as ProjectStatus,
+watch(() => props.show, (newShowVal) => {
+  if (newShowVal) {
+    if (props.project) {
+      // 編集モード: props.project の値でフォームを埋める
+      // dueDate は YYYY-MM-DD 形式の文字列として扱う
+      form.value = { ...props.project, dueDate: props.project.dueDate || '' };
+    } else {
+      // 新規作成モード: フォームをリセット
+      form.value = {
+        title: '',
+        description: '',
+        dueDate: '',
+        status: 'DRAFT' as ProjectStatus,
+      };
     }
   }
-})
+});
 
 const close = () => {
   emit('close')
