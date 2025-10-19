@@ -1,34 +1,83 @@
 import { defineStore } from 'pinia'
-import type { Project, ProjectStatus } from '~/types/api'
+import type { Project } from '~/types/api'
+import { useTaskStore } from './tasks' // useTaskStore をインポート
 
 export const useProjectStore = defineStore('projects', {
   state: () => ({
-    projects: [
-      { id: 1, name: 'Task Manager App', description: 'A simple task manager application built with Nuxt 3 and Spring Boot.', dueDate: '2025-11-01', status: 'in_progress' as ProjectStatus },
-      { id: 2, name: 'Portfolio Website', description: 'A personal portfolio website to showcase my projects.', dueDate: '2025-12-15', status: 'todo' as ProjectStatus },
-    ] as Project[],
+    projects: [] as Project[],
+    isLoading: false,
   }),
+
   getters: {
-    getProjectById: (state) => (id: number) => {
-      return state.projects.find(project => project.id === id)
-    },
-    getInProgressProjectsCount: (state) => {
-        return state.projects.filter(p => p.status === 'in_progress').length
-    }
+    getProjectById: (state) => (id: number) =>
+      state.projects.find(p => p.id === id),
+    getInProgressProjectsCount: (state) =>
+      state.projects.filter(p => p.status === 'in_progress' || p.status === 'active').length,
   },
+
   actions: {
-    addProject(project: Omit<Project, 'id'>) {
-      const newProject = { ...project, id: Math.max(...this.projects.map(p => p.id)) + 1 } as Project
-      this.projects.push(newProject)
-    },
-    updateProject(updatedProject: Project) {
-      const index = this.projects.findIndex(project => project.id === updatedProject.id)
-      if (index !== -1) {
-        this.projects[index] = updatedProject
+    // 📥 プロジェクト一覧取得
+    async fetchProjects() {
+      this.isLoading = true
+      const { $api } = useNuxtApp()
+      try {
+        const res = await $api.get('/projects')
+
+        // ✅ Spring Data Page対応
+        if (res.data && Array.isArray(res.data.content)) {
+          this.projects = res.data.content
+        } else if (Array.isArray(res.data)) {
+          this.projects = res.data
+        } else {
+          console.warn('Unexpected /api/projects response:', res)
+          this.projects = []
+        }
+
+      } catch (error) {
+        console.error('Failed to fetch projects:', error)
+        this.projects = []
+      } finally {
+        this.isLoading = false
       }
     },
-    deleteProject(id: number) {
-      this.projects = this.projects.filter(project => project.id !== id)
+
+    // ➕ プロジェクト作成
+    async createProject(project: Omit<Project, 'id'>) {
+      const { $api } = useNuxtApp()
+      try {
+        const res = await $api.post<Project>('/projects', project)
+        this.projects.push(res.data)
+      } catch (error) {
+        console.error('Failed to create project:', error)
+      }
+    },
+
+    // 🔄 プロジェクト更新
+    async updateProject(updatedProject: Project) {
+      const { $api } = useNuxtApp()
+      try {
+        const res = await $api.put<Project>(`/projects/${updatedProject.id}`, updatedProject)
+        const index = this.projects.findIndex(project => project.id === res.data.id)
+        if (index !== -1) {
+          this.projects[index] = res.data
+        }
+      } catch (error) {
+        console.error('Failed to update project:', error)
+      }
+    },
+
+    // ❌ プロジェクト削除
+    async deleteProject(id: number) {
+      const { $api } = useNuxtApp()
+      const taskStore = useTaskStore()
+
+      try {
+        await $api.delete(`/projects/${id}`)
+        this.projects = this.projects.filter(project => project.id !== id)
+        taskStore.removeTasksByProjectId(id) // 関連タスクをストアから削除
+      } catch (error) {
+        console.error('Failed to delete project:', error)
+      }
     },
   },
 })

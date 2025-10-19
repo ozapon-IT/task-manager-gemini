@@ -22,25 +22,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { CheckCircleIcon, XCircleIcon } from 'lucide-vue-next'
-import axios from '~/plugins/axios'
 
 const loading = ref(false)
 const response = ref<{ pong: boolean } | null>(null)
 const error = ref<Error | null>(null)
 
+const config = useRuntimeConfig()
+
 const ping = async () => {
   loading.value = true
   response.value = null
   error.value = null
+
   try {
-    const res = await axios.get('/api/ping')
-    response.value = res.data
+    const data = await $fetch<{ pong: boolean }>('/api/ping')
+    response.value = data
   } catch (e) {
     error.value = e as Error
   } finally {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  ping()
+})
 </script>

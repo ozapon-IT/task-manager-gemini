@@ -1,59 +1,89 @@
 import { defineStore } from 'pinia'
-import type { Task, TaskStatus, TaskPriority } from '~/types/api'
+import type { Task } from '~/types/api'
 
 export const useTaskStore = defineStore('tasks', {
   state: () => ({
-    tasks: [
-      { id: 1, projectId: 1, name: 'Design the dashboard', description: 'Create a modern and clean design for the dashboard.', dueDate: '2025-10-20', priority: 'high' as TaskPriority, status: 'in_progress' as TaskStatus },
-      { id: 2, projectId: 1, name: 'Develop the API for projects', description: 'Implement the CRUD API for projects.', dueDate: '2025-10-22', priority: 'medium' as TaskPriority, status: 'todo' as TaskStatus },
-      { id: 3, projectId: 2, name: 'Implement the task list', description: 'Create the task list component with sorting and filtering.', dueDate: '2025-10-25', priority: 'high' as TaskPriority, status: 'todo' as TaskStatus },
-      { id: 4, projectId: 2, name: 'Add dark mode support', description: 'Implement dark mode for the entire application.', dueDate: '2025-10-18', priority: 'low' as TaskPriority, status: 'done' as TaskStatus },
-    ] as Task[],
+    tasks: [] as Task[],
+    isLoading: false,
   }),
+
   getters: {
-    getTasksByProjectId: (state) => (projectId: number) => {
-      return state.tasks.filter(task => task.projectId === projectId)
-    },
-    getTaskById: (state) => (id: number) => {
-      return state.tasks.find(task => task.id === id)
-    },
-    getHighPriorityTasks: (state) => {
-        return state.tasks.filter(task => task.priority === 'high' && task.status !== 'done')
-    },
-    getTasksDueToday: (state) => {
-        const today = new Date().toISOString().split('T')[0]
-        return state.tasks.filter(task => task.dueDate === today)
-    },
-    getTasksDueIn3Days: (state) => {
-        const today = new Date()
-        const in3Days = new Date()
-        in3Days.setDate(today.getDate() + 3)
-        return state.tasks.filter(task => {
-            const dueDate = new Date(task.dueDate)
-            return dueDate >= today && dueDate <= in3Days
-        })
-    }
+    getTasksByProjectId: (state) => (projectId: number) =>
+      state.tasks.filter(task => task.projectId === projectId),
   },
+
   actions: {
-    addTask(task: Omit<Task, 'id'>) {
-      const newTask = { ...task, id: Math.max(...this.tasks.map(t => t.id)) + 1 } as Task
-      this.tasks.push(newTask)
-    },
-    updateTask(updatedTask: Task) {
-      const index = this.tasks.findIndex(task => task.id === updatedTask.id)
-      if (index !== -1) {
-        this.tasks[index] = updatedTask
+    async fetchTasksByProjectId(projectId: number) {
+      this.isLoading = true
+      const { $api } = useNuxtApp()
+      try {
+        const res = await $api.get<Task[]>(`/projects/${projectId}/tasks`)
+        if (Array.isArray(res.data)) {
+          // APIレスポンスのタスクに projectId を付与する
+          const tasksWithProjectId = res.data.map(task => ({ ...task, projectId }))
+
+          // 既存のタスクを維持しつつ、新しいタスクを追加（重複を避ける）
+          const existingTaskIds = new Set(this.tasks.map(t => t.id))
+          const newTasks = tasksWithProjectId.filter(t => !existingTaskIds.has(t.id))
+          this.tasks.push(...newTasks)
+        }
+      } catch (error) {
+        console.error(`Failed to fetch tasks for project ${projectId}:`, error)
+      } finally {
+        this.isLoading = false
       }
     },
-    deleteTask(id: number) {
-      this.tasks = this.tasks.filter(task => task.id !== id)
+
+    // ➕ タスク作成
+    async createTask(projectId: number, task: Omit<Task, 'id' | 'projectId'>) {
+      const { $api } = useNuxtApp()
+      try {
+        const res = await $api.post<Task>(`/projects/${projectId}/tasks`, task)
+        this.tasks.push({ ...res.data, projectId })
+      } catch (error) {
+        console.error('Failed to create task:', error)
+      }
     },
-    toggleTaskStatus(id: number) {
-        const task = this.getTaskById(id)
-        if (task) {
-            task.status = task.status === 'done' ? 'todo' : 'done'
-            this.updateTask(task)
+
+    async updateTask(updatedTask: Task) {
+      const { $api } = useNuxtApp()
+      try {
+        const res = await $api.put<Task>(
+          `/projects/${updatedTask.projectId}/tasks/${updatedTask.id}`,
+          updatedTask
+        )
+        const index = this.tasks.findIndex(task => task.id === res.data.id)
+        if (index !== -1) {
+          // 元の projectId を維持しつつ、レスポンスデータで更新する
+          this.tasks[index] = { ...res.data, projectId: this.tasks[index].projectId }
         }
-    }
+      } catch (error) {
+        console.error('Failed to update task:', error)
+      }
+    },
+
+    // ❌ タスク削除
+    async deleteTask(task: Task) {
+      const { $api } = useNuxtApp()
+      try {
+        await $api.delete(`/projects/${task.projectId}/tasks/${task.id}`)
+        this.tasks = this.tasks.filter(t => t.id !== task.id)
+      } catch (error) {
+        console.error('Failed to delete task:', error)
+      }
+    },
+
+    // 🔁 ステータス切替
+    async toggleTaskStatus(task: Task) {
+      // ステータスは大文字・小文字を区別せずに比較し、大文字のEnum値に設定する
+      const newStatus = task.status.toUpperCase() === 'DONE' ? 'TODO' : 'DONE'
+      const updatedTask = { ...task, status: newStatus }
+      await this.updateTask(updatedTask)
+    },
+
+    // プロジェクトIDを指定してタスクをストアから削除
+    removeTasksByProjectId(projectId: number) {
+      this.tasks = this.tasks.filter(task => task.projectId !== projectId)
+    },
   },
 })
